@@ -1,0 +1,23 @@
+flowchart LR
+    Source["Data Source\n(External Entity — CSV Upload)"]
+    S3[("Amazon S3 Bucket\n(Incoming CSVs)")]
+    P1(("Process 1\nLambda: Security Check\n& Formatting"))
+    P2(("Process 2\nLambda: Submit to\nK8s Service"))
+    P3(("Process 3\nK8s Service: Consume CSV &\nBuild INSERT Statement"))
+    DB[("PostgreSQL Database")]
+
+    Source -->|"1. CSV file"| S3
+    S3 -->|"2. S3 event trigger →\nreads raw CSV object"| P1
+    P1 -->|"3. validated + formatted CSV"| P2
+    P2 -->|"4. CSV data payload (API call)"| P3
+    P3 -->|"5. generated INSERT statement(s)"| DB
+
+    classDef entity fill:#F2F2F2,stroke:#616161,stroke-width:2px,color:#333;
+    classDef store fill:#E8F8F0,stroke:#3F8624,stroke-width:2px,color:#16191F;
+    classDef process fill:#FFF3E0,stroke:#FF9900,stroke-width:2px,color:#16191F;
+    classDef db fill:#EAF3FF,stroke:#1F62B0,stroke-width:2px,color:#16191F;
+
+    class Source entity;
+    class S3 store;
+    class P1,P2,P3 process;
+    class DB db;
