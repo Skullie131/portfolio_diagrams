@@ -1,0 +1,64 @@
+flowchart TD
+    Internet(["Internet / End Users"])
+    ExtLog["External Logging /\nMonitoring & Alerting\n(3rd-party SaaS, outside boundary)"]
+
+    subgraph Boundary["AWS Cloud — Authorization Boundary"]
+        direction TB
+
+        WAF["AWS WAF\n(Web ACL)"]
+        NLB["Network Load\nBalancer (NLB)"]
+        ALB["Application Load\nBalancer (ALB)"]
+
+        subgraph EKS["Amazon EKS Cluster"]
+            Pods["Application Pods / Services"]
+        end
+
+        S3Static[("Amazon S3\n(Static Service Assets)")]
+        Aurora[("Amazon Aurora PostgreSQL\n(Multi-AZ Clusters)")]
+        Redis[("Amazon ElastiCache\n(Redis)")]
+        Lambda["AWS Lambda\n(Log Export Functions)"]
+
+        CF["Amazon CloudFront\n(3 Distributions)"]
+        S3A[("S3 Bucket A")]
+        S3B[("S3 Bucket B")]
+        S3C[("S3 Bucket C")]
+    end
+
+    Internet --> WAF
+    Internet -. "separate CDN path" .-> CF
+
+    WAF --> NLB
+    WAF --> ALB
+    NLB --> EKS
+    ALB --> EKS
+
+    Pods --> S3Static
+    Pods --> Aurora
+    Pods --> Redis
+    Pods --> Lambda
+
+    Lambda -. "exported log/metric events" .-> ExtLog
+
+    CF --> S3A
+    CF --> S3B
+    CF --> S3C
+
+    S3A -. "no EKS cluster access" .- S3B
+
+    classDef edge fill:#FFF3E0,stroke:#FF9900,stroke-width:2px,color:#16191F;
+    classDef compute fill:#EEF5FF,stroke:#232F3E,stroke-width:2px,color:#16191F;
+    classDef cdn fill:#F3EDFF,stroke:#8C4FFF,stroke-width:2px,color:#16191F;
+    classDef storage fill:#E8F8F0,stroke:#3F8624,stroke-width:2px,color:#16191F;
+    classDef db fill:#EAF3FF,stroke:#1F62B0,stroke-width:2px,color:#16191F;
+    classDef cache fill:#FDECEC,stroke:#C0392B,stroke-width:2px,color:#16191F;
+    classDef serverless fill:#FFF6E5,stroke:#F58536,stroke-width:2px,color:#16191F;
+    classDef external fill:#F2F2F2,stroke:#616161,stroke-width:2px,color:#333,stroke-dasharray:5 3;
+
+    class WAF,NLB,ALB edge;
+    class EKS,Pods compute;
+    class CF cdn;
+    class S3Static,S3A,S3B,S3C storage;
+    class Aurora db;
+    class Redis cache;
+    class Lambda serverless;
+    class Internet,ExtLog external;
