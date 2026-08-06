@@ -1,0 +1,90 @@
+flowchart TB
+    Ext[("External Endpoints\n(APIs / SIEM / Monitoring Backends /\nAlerting Services)")]
+
+    subgraph Cluster["Kubernetes Cluster"]
+        direction TB
+
+        subgraph NodeA["Node A (general worker)"]
+            direction TB
+            AppPod1["App Pod\n(app namespace - Deployment)"]
+            MonDS_A["Monitoring DaemonSet Pod\n(monitoring namespace)"]
+            SecDS_A["Security DaemonSet Pod\n(security namespace)"]
+        end
+
+        subgraph NodeB["Node B (general worker)"]
+            direction TB
+            AppPod2["App Pod\n(app namespace - Deployment)"]
+            WorkerPod["Monitoring Worker Pod\n(runs in app namespace)"]
+            MonDS_B["Monitoring DaemonSet Pod\n(monitoring namespace)"]
+            SecDS_B["Security DaemonSet Pod\n(security namespace)"]
+        end
+
+        subgraph NodeC["Node C (general worker)"]
+            direction TB
+            AppPod3["App Pod\n(app namespace - Deployment)"]
+            MonDS_C["Monitoring DaemonSet Pod\n(monitoring namespace)"]
+            SecDS_C["Security DaemonSet Pod\n(security namespace)"]
+        end
+
+        subgraph NodeD["Node D - dedicated / tainted (AI only)"]
+            direction TB
+            AIPod["AI Pod\n(ai namespace - Deployment)"]
+        end
+
+        subgraph MonNS["monitoring namespace"]
+            direction LR
+            MonSvc["Monitoring Service"]
+            MonMgmt["Management + Secrets/Config"]
+        end
+
+        subgraph SecNS["security namespace"]
+            direction LR
+            SecSvc["Security Service"]
+            SecMgmt["Management + Secrets/Config"]
+        end
+    end
+
+    %% control relationships: monitoring/security namespaces own config+secrets for their DaemonSets and the worker pod
+    MonMgmt -. config/secrets .-> MonDS_A
+    MonMgmt -. config/secrets .-> MonDS_B
+    MonMgmt -. config/secrets .-> MonDS_C
+    MonMgmt -. config/secrets .-> WorkerPod
+    MonSvc -. fronts .-> MonDS_A
+    MonSvc -. fronts .-> MonDS_B
+    MonSvc -. fronts .-> MonDS_C
+
+    SecMgmt -. config/secrets .-> SecDS_A
+    SecMgmt -. config/secrets .-> SecDS_B
+    SecMgmt -. config/secrets .-> SecDS_C
+    SecSvc -. fronts .-> SecDS_A
+    SecSvc -. fronts .-> SecDS_B
+    SecSvc -. fronts .-> SecDS_C
+
+    %% all cross-pod / cross-namespace communication happens over external endpoints, never in-cluster k8s networking
+    AppPod1 -.->|external endpoint| Ext
+    AppPod2 -.->|external endpoint| Ext
+    AppPod3 -.->|external endpoint| Ext
+    WorkerPod -.->|external endpoint| Ext
+    MonSvc -.->|external endpoint| Ext
+    SecSvc -.->|external endpoint| Ext
+    AIPod -.->|external endpoint| Ext
+
+    %% monitoring and security namespaces also push information out to the application services
+    MonSvc -.->|external endpoint - data/results to app| AppPod1
+    MonSvc -.->|external endpoint - data/results to app| AppPod2
+    MonSvc -.->|external endpoint - data/results to app| AppPod3
+    SecSvc -.->|external endpoint - data/results to app| AppPod1
+    SecSvc -.->|external endpoint - data/results to app| AppPod2
+    SecSvc -.->|external endpoint - data/results to app| AppPod3
+
+    classDef app fill:#EEF5FF,stroke:#232F3E,stroke-width:2px,color:#16191F;
+    classDef monitoring fill:#E8F8F0,stroke:#3F8624,stroke-width:2px,color:#16191F;
+    classDef security fill:#FDECEC,stroke:#C0392B,stroke-width:2px,color:#16191F;
+    classDef ai fill:#F3EDFF,stroke:#8C4FFF,stroke-width:2px,color:#16191F;
+    classDef external fill:#F2F2F2,stroke:#616161,stroke-width:2px,color:#333,stroke-dasharray:5 3;
+
+    class AppPod1,AppPod2,AppPod3 app;
+    class WorkerPod,MonDS_A,MonDS_B,MonDS_C,MonSvc,MonMgmt monitoring;
+    class SecDS_A,SecDS_B,SecDS_C,SecSvc,SecMgmt security;
+    class AIPod ai;
+    class Ext external;
